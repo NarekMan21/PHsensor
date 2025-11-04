@@ -386,21 +386,37 @@ void updateNpointData() {
   Serial.println("📤 Отправка данных в npoint.io:");
   Serial.println(jsonData);
   
-  // Отправляем данные в npoint.io через HTTPS
-  // npoint.io использует PUT для обновления данных
+  // npoint.io требует: сначала прочитать данные, обновить их, затем записать
+  // Шаг 1: Читаем текущие данные из npoint.io
+  httpClient.begin(secureClient, NPOINT_URL);
+  int readCode = httpClient.GET();
+  String currentData = "";
+  
+  if (readCode == 200) {
+    currentData = httpClient.getString();
+    Serial.print("📖 Текущие данные из npoint.io: ");
+    Serial.println(currentData);
+  } else {
+    Serial.printf("⚠️ Не удалось прочитать данные (код: %d), создаем новые\n", readCode);
+  }
+  httpClient.end();
+  
+  // Шаг 2: Отправляем новые данные через PUT
+  // Используем прямой JSON без обновления существующих данных
   httpClient.begin(secureClient, NPOINT_URL);
   httpClient.addHeader("Content-Type", "application/json");
+  httpClient.addHeader("Accept", "application/json");
   
-  // Пробуем PUT (предпочтительно), если не работает - POST
   int httpResponseCode = httpClient.PUT(jsonData);
   
-  // Если PUT не работает (код 0 или ошибка), пробуем POST
-  if (httpResponseCode <= 0) {
-    Serial.println("⚠️ PUT не сработал, пробую POST...");
+  // Если PUT не работает (404 или другая ошибка), пробуем POST
+  if (httpResponseCode == 404 || httpResponseCode <= 0) {
+    Serial.printf("⚠️ PUT вернул код %d, пробую POST...\n", httpResponseCode);
     httpClient.end();
     delay(100);
     httpClient.begin(secureClient, NPOINT_URL);
     httpClient.addHeader("Content-Type", "application/json");
+    httpClient.addHeader("Accept", "application/json");
     httpResponseCode = httpClient.POST(jsonData);
   }
   
@@ -415,26 +431,35 @@ void updateNpointData() {
       Serial.println("✅ Данные успешно записаны в npoint.io");
       
       // Проверяем, что данные действительно записались - читаем обратно
-      delay(500);
+      delay(1000);  // Даем время на запись
       httpClient.end();
       httpClient.begin(secureClient, NPOINT_URL);
-      int readCode = httpClient.GET();
-      if (readCode > 0) {
-        String readResponse = httpClient.getString();
+      int verifyCode = httpClient.GET();
+      if (verifyCode == 200) {
+        String verifyResponse = httpClient.getString();
         Serial.print("📖 Проверка записи - прочитанные данные: ");
-        Serial.println(readResponse);
+        Serial.println(verifyResponse);
         
         // Парсим JSON для проверки
         DynamicJsonDocument checkDoc(512);
-        DeserializationError error = deserializeJson(checkDoc, readResponse);
+        DeserializationError error = deserializeJson(checkDoc, verifyResponse);
         if (!error && checkDoc["temperature"].is<float>()) {
-          Serial.println("✅ Подтверждение: данные записались корректно!");
+          float temp = checkDoc["temperature"];
+          Serial.printf("✅ Подтверждение: данные записались корректно! Температура: %.1f°C\n", temp);
         } else {
           Serial.println("⚠️ Внимание: данные могут не записаться корректно");
+          Serial.print("   Ошибка парсинга или структура данных: ");
+          Serial.println(verifyResponse);
         }
+      } else {
+        Serial.printf("⚠️ Не удалось проверить запись (код: %d)\n", verifyCode);
       }
     } else {
       Serial.printf("⚠️ Неожиданный код ответа: %d\n", httpResponseCode);
+      Serial.println("   Возможные причины:");
+      Serial.println("   - Endpoint не поддерживает запись");
+      Serial.println("   - Нужна аутентификация");
+      Serial.println("   - Неправильный URL");
     }
   } else {
     Serial.printf("❌ Ошибка отправки в npoint.io: %d\n", httpResponseCode);
@@ -443,6 +468,7 @@ void updateNpointData() {
     Serial.println("   - URL npoint.io правильный");
     Serial.println("   - ESP8266 может подключаться к HTTPS");
     Serial.println("   - Endpoint создан и доступен для записи");
+    Serial.println("   - Endpoint поддерживает PUT/POST запросы");
   }
   
   httpClient.end();
