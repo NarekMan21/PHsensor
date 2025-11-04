@@ -358,13 +358,22 @@ void publishData() {
 
 // Обновление данных в npoint.io (облачный сервис)
 void updateNpointData() {
+  Serial.println("🔍 [DEBUG] updateNpointData() вызвана");
+  
   if (strlen(NPOINT_URL) == 0) {
+    Serial.println("⚠️ [DEBUG] NPOINT_URL пустой, выход");
     return; // Облачный режим не включен
   }
   
+  Serial.printf("📋 [DEBUG] NPOINT_URL: %s\n", NPOINT_URL);
+  Serial.printf("📋 [DEBUG] sensorData.valid: %s\n", sensorData.valid ? "true" : "false");
+  
   if (!sensorData.valid) {
+    Serial.println("⚠️ [DEBUG] sensorData.valid = false, выход");
     return; // Нет данных для отправки
   }
+  
+  Serial.println("✅ [DEBUG] Начинаю отправку данных в npoint.io");
   
   // Формируем JSON с данными датчика
   DynamicJsonDocument doc(512);
@@ -591,8 +600,12 @@ void setup() {
   setupWebServer();
   sensorData.valid = false;
   lastPublishTime = millis() - PUBLISH_INTERVAL;
+  lastNpointUpdate = millis() - NPOINT_UPDATE_INTERVAL; // Инициализация для первого обновления
   
   Serial.println("\nСистема запущена. Ожидание данных с датчика...\n");
+  Serial.printf("📋 [DEBUG] NPOINT_URL: %s\n", NPOINT_URL);
+  Serial.printf("📋 [DEBUG] NPOINT_UPDATE_INTERVAL: %d мс\n", NPOINT_UPDATE_INTERVAL);
+  Serial.printf("📋 [DEBUG] lastNpointUpdate инициализирован: %lu\n", lastNpointUpdate);
 }
 
 void loop() {
@@ -614,8 +627,20 @@ void loop() {
   }
   
   // Обновление данных в npoint.io (облачный сервис)
-  if (strlen(NPOINT_URL) > 0 && millis() - lastNpointUpdate >= NPOINT_UPDATE_INTERVAL) {
-    updateNpointData();
+  static unsigned long lastNpointCheck = 0;
+  if (millis() - lastNpointCheck >= 1000) { // Проверяем каждую секунду
+    lastNpointCheck = millis();
+    if (strlen(NPOINT_URL) > 0) {
+      unsigned long timeSinceLastUpdate = millis() - lastNpointUpdate;
+      Serial.printf("⏱️ [DEBUG] Прошло времени с последнего обновления npoint.io: %lu мс (интервал: %d мс)\n", 
+                    timeSinceLastUpdate, NPOINT_UPDATE_INTERVAL);
+      if (timeSinceLastUpdate >= NPOINT_UPDATE_INTERVAL) {
+        Serial.println("🔄 [DEBUG] Интервал достигнут, вызываю updateNpointData()");
+        updateNpointData();
+      }
+    } else {
+      Serial.println("⚠️ [DEBUG] NPOINT_URL не задан");
+    }
   }
   
   delay(10); // Уменьшена задержка для более быстрой реакции
