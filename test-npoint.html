@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест npoint.io</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-section {
+            background: #2a2a2a;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        button {
+            background: #03a9f4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0288d1;
+        }
+        pre {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .success { color: #4caf50; }
+        .error { color: #f44336; }
+        .info { color: #03a9f4; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Тест npoint.io API</h1>
+    
+    <div class="test-section">
+        <h2>1. Чтение данных (GET)</h2>
+        <button onclick="testRead()">Читать данные</button>
+        <pre id="readResult"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. Запись данных (POST)</h2>
+        <button onclick="testWrite()">Записать тестовые данные</button>
+        <pre id="writeResult"></pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. Проверка после записи (GET)</h2>
+        <button onclick="testReadAfterWrite()">Проверить после записи</button>
+        <pre id="readAfterWriteResult"></pre>
+    </div>
+    
+    <script>
+        const NPOINT_URL = 'https://api.npoint.io/efd090017c044e964c70';
+        
+        // Тестовые данные (как от ESP8266)
+        const testData = {
+            temperature: 25.5,
+            humidity: 60.2,
+            conductivity: 1500,
+            pH: 6.8,
+            nitrogen: 120,
+            phosphorus: 80,
+            potassium: 200,
+            valid: true,
+            timestamp: Date.now(),
+            ip: "192.168.1.100"
+        };
+        
+        async function testRead() {
+            const result = document.getElementById('readResult');
+            result.innerHTML = '<span class="info">Запрос данных...</span>';
+            
+            try {
+                const response = await fetch(NPOINT_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                result.innerHTML = `<span class="success">✅ Успешно!</span>
+HTTP Status: ${response.status}
+Данные:
+${JSON.stringify(data, null, 2)}
+
+Поля в данных:
+${Object.keys(data).join(', ')}
+
+Есть temperature? ${data.temperature !== undefined ? '✅ ДА' : '❌ НЕТ'}
+Есть valid? ${data.valid !== undefined ? '✅ ДА' : '❌ НЕТ'}`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Ошибка:</span>
+${error.message}`;
+            }
+        }
+        
+        async function testWrite() {
+            const result = document.getElementById('writeResult');
+            result.innerHTML = '<span class="info">Запись данных...</span>';
+            
+            try {
+                const response = await fetch(NPOINT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const responseData = await response.json();
+                result.innerHTML = `<span class="success">✅ Успешно!</span>
+HTTP Status: ${response.status}
+Ответ сервера:
+${JSON.stringify(responseData, null, 2)}`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Ошибка:</span>
+${error.message}`;
+            }
+        }
+        
+        async function testReadAfterWrite() {
+            const result = document.getElementById('readAfterWriteResult');
+            result.innerHTML = '<span class="info">Проверка данных после записи...</span>';
+            
+            // Ждем 1 секунду, чтобы данные записались
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            try {
+                const response = await fetch(NPOINT_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                const data = await response.json();
+                result.innerHTML = `<span class="success">✅ Данные получены!</span>
+HTTP Status: ${response.status}
+Данные:
+${JSON.stringify(data, null, 2)}
+
+Поля в данных:
+${Object.keys(data).join(', ')}
+
+Есть temperature? ${data.temperature !== undefined ? '✅ ДА' : '❌ НЕТ'}
+Есть valid? ${data.valid !== undefined ? '✅ ДА' : '❌ НЕТ'}
+
+Температура: ${data.temperature || 'НЕТ'}
+Влажность: ${data.humidity || 'НЕТ'}`;
+            } catch (error) {
+                result.innerHTML = `<span class="error">❌ Ошибка:</span>
+${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>
+

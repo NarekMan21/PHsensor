@@ -482,16 +482,29 @@
                 const data = await response.json();
                 log(`Получен ответ от сервера`, 'success');
                 
+                // Логируем полученные данные для отладки
+                log(`Полученные данные: ${JSON.stringify(data)}`, 'info');
+                
                 // Проверяем наличие данных датчика
                 if (data && data.temperature !== undefined && data.valid !== false) {
-                    log('Данные датчика получены успешно', 'success');
+                    log(`Данные датчика получены успешно: температура=${data.temperature}°C`, 'success');
                     updateDisplay(data);
                     updateStatus('Подключено', true);
                     hideMessage();
                     isConnected = true;
                     return true;
                 } else {
-                    log('Данные датчика еще не получены из ESP8266', 'warning');
+                    // Логируем, почему данные не приняты
+                    if (!data) {
+                        log('Данные не получены: ответ пустой', 'warning');
+                    } else if (data.temperature === undefined) {
+                        log('Данные не получены: нет поля temperature в ответе', 'warning');
+                        log(`Структура данных: ${JSON.stringify(Object.keys(data))}`, 'info');
+                    } else if (data.valid === false) {
+                        log('Данные не получены: valid=false', 'warning');
+                    } else {
+                        log('Данные датчика еще не получены из ESP8266', 'warning');
+                    }
                     showMessage('Данные датчика еще не получены из ESP8266. Подождите несколько секунд...', 'error');
                     updateStatus('Ожидание данных...', false);
                     isConnected = false;

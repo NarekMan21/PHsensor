@@ -382,6 +382,10 @@ void updateNpointData() {
   String jsonData;
   serializeJson(doc, jsonData);
   
+  // Выводим JSON для отладки
+  Serial.println("📤 Отправка данных в npoint.io:");
+  Serial.println(jsonData);
+  
   // Отправляем данные в npoint.io через HTTPS
   httpClient.begin(secureClient, NPOINT_URL);
   httpClient.addHeader("Content-Type", "application/json");
@@ -390,9 +394,19 @@ void updateNpointData() {
   if (httpResponseCode > 0) {
     Serial.printf("☁️ Данные отправлены в npoint.io (код: %d)\n", httpResponseCode);
     String response = httpClient.getString();
-    // Можно обработать ответ, если нужно
+    Serial.print("📥 Ответ от npoint.io: ");
+    Serial.println(response);
+    
+    // Проверяем, что данные действительно записались
+    if (httpResponseCode == 200 || httpResponseCode == 201) {
+      Serial.println("✅ Данные успешно записаны в npoint.io");
+    }
   } else {
     Serial.printf("❌ Ошибка отправки в npoint.io: %d\n", httpResponseCode);
+    Serial.println("   Проверьте:");
+    Serial.println("   - Подключение к WiFi");
+    Serial.println("   - URL npoint.io правильный");
+    Serial.println("   - ESP8266 может подключаться к HTTPS");
   }
   
   httpClient.end();
