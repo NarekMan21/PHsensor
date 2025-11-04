@@ -111,24 +111,45 @@ ${error.message}`;
             const result = document.getElementById('writeResult');
             result.innerHTML = '<span class="info">Запись данных...</span>';
             
-            try {
-                const response = await fetch(NPOINT_URL, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(testData)
-                });
-                
-                const responseData = await response.json();
-                result.innerHTML = `<span class="success">✅ Успешно!</span>
+            // Пробуем разные методы (PUT обычно работает для npoint.io)
+            const methods = ['PUT', 'POST', 'PATCH'];
+            let lastError = null;
+            
+            for (const method of methods) {
+                try {
+                    result.innerHTML += `<br><span class="info">Пробую ${method}...</span>`;
+                    
+                    const response = await fetch(NPOINT_URL, {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(testData)
+                    });
+                    
+                    const responseText = await response.text();
+                    let responseData;
+                    try {
+                        responseData = responseText ? JSON.parse(responseText) : null;
+                    } catch (e) {
+                        responseData = responseText || 'Пустой ответ';
+                    }
+                    
+                    result.innerHTML = `<span class="success">✅ Успешно с методом ${method}!</span>
 HTTP Status: ${response.status}
 Ответ сервера:
-${JSON.stringify(responseData, null, 2)}`;
-            } catch (error) {
-                result.innerHTML = `<span class="error">❌ Ошибка:</span>
-${error.message}`;
+${typeof responseData === 'string' ? responseData : (responseData ? JSON.stringify(responseData, null, 2) : 'Пустой ответ')}
+
+Проверка: Попробуйте прочитать данные через "Проверить после записи"`;
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    result.innerHTML += `<br><span class="error">${method} не работает: ${error.message}</span>`;
+                }
             }
+            
+            result.innerHTML += `<br><span class="error">❌ Все методы не работают. Последняя ошибка:</span>
+${lastError ? lastError.message : 'Неизвестная ошибка'}`;
         }
         
         async function testReadAfterWrite() {

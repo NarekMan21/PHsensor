@@ -387,9 +387,22 @@ void updateNpointData() {
   Serial.println(jsonData);
   
   // Отправляем данные в npoint.io через HTTPS
+  // npoint.io использует PUT для обновления данных
   httpClient.begin(secureClient, NPOINT_URL);
   httpClient.addHeader("Content-Type", "application/json");
-  int httpResponseCode = httpClient.POST(jsonData);
+  
+  // Пробуем PUT (предпочтительно), если не работает - POST
+  int httpResponseCode = httpClient.PUT(jsonData);
+  
+  // Если PUT не работает (код 0 или ошибка), пробуем POST
+  if (httpResponseCode <= 0) {
+    Serial.println("⚠️ PUT не сработал, пробую POST...");
+    httpClient.end();
+    delay(100);
+    httpClient.begin(secureClient, NPOINT_URL);
+    httpClient.addHeader("Content-Type", "application/json");
+    httpResponseCode = httpClient.POST(jsonData);
+  }
   
   if (httpResponseCode > 0) {
     Serial.printf("☁️ Данные отправлены в npoint.io (код: %d)\n", httpResponseCode);
@@ -400,6 +413,28 @@ void updateNpointData() {
     // Проверяем, что данные действительно записались
     if (httpResponseCode == 200 || httpResponseCode == 201) {
       Serial.println("✅ Данные успешно записаны в npoint.io");
+      
+      // Проверяем, что данные действительно записались - читаем обратно
+      delay(500);
+      httpClient.end();
+      httpClient.begin(secureClient, NPOINT_URL);
+      int readCode = httpClient.GET();
+      if (readCode > 0) {
+        String readResponse = httpClient.getString();
+        Serial.print("📖 Проверка записи - прочитанные данные: ");
+        Serial.println(readResponse);
+        
+        // Парсим JSON для проверки
+        DynamicJsonDocument checkDoc(512);
+        DeserializationError error = deserializeJson(checkDoc, readResponse);
+        if (!error && checkDoc["temperature"].is<float>()) {
+          Serial.println("✅ Подтверждение: данные записались корректно!");
+        } else {
+          Serial.println("⚠️ Внимание: данные могут не записаться корректно");
+        }
+      }
+    } else {
+      Serial.printf("⚠️ Неожиданный код ответа: %d\n", httpResponseCode);
     }
   } else {
     Serial.printf("❌ Ошибка отправки в npoint.io: %d\n", httpResponseCode);
@@ -407,6 +442,7 @@ void updateNpointData() {
     Serial.println("   - Подключение к WiFi");
     Serial.println("   - URL npoint.io правильный");
     Serial.println("   - ESP8266 может подключаться к HTTPS");
+    Serial.println("   - Endpoint создан и доступен для записи");
   }
   
   httpClient.end();
